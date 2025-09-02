@@ -15,9 +15,8 @@ enum TileType {
     TILE_BLUE,
 };
 
-// チュートリアル用マップ
-// 0=空白, 1=赤ブロック, 2=青ブロック
 int map[MAP_HEIGHT][MAP_WIDTH] = {
+    // 0=空白, 1=赤ブロック, 2=青ブロック
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -26,11 +25,10 @@ int map[MAP_HEIGHT][MAP_WIDTH] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}, // 赤い床
-    {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}, // 青い床
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {1,1,1,1,1,1,0,0,0,2,0,0,0,1,0,0,0,2,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {2,2,2,2,2,2,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 };
@@ -42,6 +40,11 @@ struct Player {
     int size;
     bool isRed; // true=赤, false=青
 } player;
+
+// ブロックが「プレイヤーと同じ色かどうか」判定
+bool IsSolid(int tile, bool isRed) {
+    return (tile == TILE_RED && isRed) || (tile == TILE_BLUE && !isRed);
+}
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Novice::Initialize(kWindowTitle, 1280, 736);
@@ -67,9 +70,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
 
-        ///
-        /// ↓更新処理
-        ///
+        ////////////// ↓更新処理 //////////////
 
         // 左右移動
         player.vx = 0;
@@ -88,38 +89,76 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         // 重力
         player.vy += gravity;
 
-        // ジャンプ（足場に乗っているときだけ）
-        if (!preKeys[DIK_SPACE] && keys[DIK_SPACE]) {
-            // 足場チェック
-            int footX = static_cast<int>((player.x + player.size / 2) / CHIP_SIZE);
-            int footY = static_cast<int>((player.y + player.size) / CHIP_SIZE);
-            if (footY < MAP_HEIGHT) {
-                int tile = map[footY][footX];
-                if ((tile == TILE_RED && player.isRed) || (tile == TILE_BLUE && !player.isRed)) {
-                    player.vy = jumpPower;
+        // --- 横方向の当たり判定 ---
+        float nextX = player.x + player.vx;
+        int left = (int)(nextX / CHIP_SIZE);
+        int right = (int)((nextX + player.size) / CHIP_SIZE);
+        int top = (int)(player.y / CHIP_SIZE);
+        int bottom = (int)((player.y + player.size - 1) / CHIP_SIZE);
+
+        bool hitWall = false;
+        if (player.vx > 0) { // 右移動
+            for (int ty = top; ty <= bottom; ty++) {
+                if (right < MAP_WIDTH && IsSolid(map[ty][right], player.isRed)) {
+                    player.x = right * CHIP_SIZE - player.size - 0.01f;
+                    player.vx = 0;
+                    hitWall = true;
+                    break;
                 }
             }
         }
-
-        // 位置更新
-        player.x += player.vx;
-        player.y += player.vy;
-
-        // 足場との当たり判定
-        int footX = static_cast<int>((player.x + player.size / 2) / CHIP_SIZE);
-        int footY = static_cast<int>((player.y + player.size) / CHIP_SIZE);
-        if (footX >= 0 && footX < MAP_WIDTH && footY >= 0 && footY < MAP_HEIGHT) {
-            int tile = map[footY][footX];
-            if ((tile == TILE_RED && player.isRed) || (tile == TILE_BLUE && !player.isRed)) {
-                // 床の上に乗る
-                player.y = footY * (float)CHIP_SIZE - player.size;
-                player.vy = 0;
+        else if (player.vx < 0) { // 左移動
+            for (int ty = top; ty <= bottom; ty++) {
+                if (left >= 0 && IsSolid(map[ty][left], player.isRed)) {
+                    player.x = (left + 1) * CHIP_SIZE + 0.01f;
+                    player.vx = 0;
+                    hitWall = true;
+                    break;
+                }
             }
         }
+        if (!hitWall) {
+            player.x += player.vx;
+        }
 
-        ///
-        /// ↓描画処理
-        ///
+        // --- 縦方向の当たり判定（床・天井） ---
+        float nextY = player.y + player.vy;
+        left = (int)(player.x / CHIP_SIZE);
+        right = (int)((player.x + player.size - 1) / CHIP_SIZE);
+        int footY = (int)((nextY + player.size) / CHIP_SIZE);
+        int headY = (int)(nextY / CHIP_SIZE);
+
+        bool onGround = false;
+        if (player.vy >= 0) { // 下方向
+            for (int tx = left; tx <= right; tx++) {
+                if (footY < MAP_HEIGHT && IsSolid(map[footY][tx], player.isRed)) {
+                    player.y = static_cast<float>(footY) * CHIP_SIZE - player.size;
+                    player.vy = 0;
+                    onGround = true;
+                    break;
+                }
+            }
+        }
+        else { // 上方向
+            for (int tx = left; tx <= right; tx++) {
+                if (headY >= 0 && IsSolid(map[headY][tx], player.isRed)) {
+                    player.y = (static_cast<float>(headY) + 1.0f) * CHIP_SIZE;
+                    player.vy = 0;
+                    break;
+                }
+            }
+        }
+        if (!onGround) {
+            player.y = nextY;
+        }
+
+        // ジャンプ
+        if (!preKeys[DIK_SPACE] && keys[DIK_SPACE] && onGround) {
+            player.vy = jumpPower;
+        }
+        ////////////// 更新処理 //////////////
+
+        ////////////// ↓描画処理 //////////////
 
         // マップを描画
         for (int y = 0; y < MAP_HEIGHT; y++) {
@@ -145,9 +184,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         unsigned int pColor = player.isRed ? 0xFF0000FF : 0x0000FFFF;
         Novice::DrawBox((int)player.x, (int)player.y, player.size, player.size, 0.0f, pColor, kFillModeSolid);
 
-        ///
-        /// ↑描画処理ここまで
-        ///
+        ////////////// 描画処理 //////////////
 
         Novice::EndFrame();
 
