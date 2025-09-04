@@ -1,5 +1,7 @@
 #include <Novice.h>
 #include <math.h>
+#include <cstdlib> // rand, srand
+#include <ctime>   // time
 
 const char kWindowTitle[] = "6044_\n";
 
@@ -8,6 +10,8 @@ struct Ball {
     int x, y;
     int radius;
     unsigned int color;
+    int speed;
+    bool isFixed;  // 固定されているか
 };
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -19,11 +23,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     int openHand = Novice::LoadTexture("./Resources./openHand.png");
     int closeHand = Novice::LoadTexture("./Resources./closeHand.png");
 
-    // ボール（黒と白）
-    Ball balls[2] = {
-        {640, 250, 30, BLACK},  // 黒
-        {640, 550, 30, WHITE}   // 白
-    };
+    srand((unsigned int)time(nullptr)); // 乱数の種
+
+    // ボール（黒か白をランダムで10個生成）
+    const int ballCount = 10;
+    Ball balls[ballCount];
+    for (int i = 0; i < ballCount; i++) {
+        balls[i].x = 640;                       // 真ん中の線上
+        balls[i].y = -i * 150;                  // 上からずらして配置
+        balls[i].radius = 30;
+        balls[i].color = (rand() % 2 == 0) ? BLACK : WHITE;
+        balls[i].speed = 3 + rand() % 3;        // 落下速度ランダム（3〜5）
+        balls[i].isFixed = false;               // 最初は落ちる
+    }
 
     // マウス
     int mousePosX = 0;
@@ -47,13 +59,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
 
+        ///
+        /// 更新処理ここから
+        /// 
+
         // マウス座標
         Novice::GetMousePosition(&mousePosX, &mousePosY);
         Novice::SetMouseCursorVisibility(visibility);
 
+        // ボールの落下処理（固定されていない && 掴まれていないボールだけ落ちる）
+        for (int i = 0; i < ballCount; i++) {
+            if (!balls[i].isFixed && grabbingIndex != i) {
+                balls[i].y += balls[i].speed;
+
+                // 下まで行ったら止まる（仮に画面下で固定）
+                if (balls[i].y + balls[i].radius > 720) {
+                    balls[i].y = 720 - balls[i].radius;
+                    balls[i].isFixed = true;
+                }
+            }
+        }
+
         // まだ掴んでいないときにクリックしたら、近いボールを掴む
         if (grabbingIndex == -1 && Novice::IsPressMouse(0)) {
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < ballCount; i++) {
                 float dx = float(balls[i].x - mousePosX);
                 float dy = float(balls[i].y - mousePosY);
                 float dist = sqrtf(dx * dx + dy * dy);
@@ -69,19 +98,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             balls[grabbingIndex].x = mousePosX;
             balls[grabbingIndex].y = mousePosY;
 
-            // クリックを離したら掴むのをやめる
+            // クリックを離したら掴むのをやめる → その場で固定
             if (!Novice::IsPressMouse(0)) {
+                balls[grabbingIndex].isFixed = true;
                 grabbingIndex = -1;
             }
         }
 
-        // === 描画 ===
+        ///
+        /// 更新処理ここまで
+        /// 
+
+        ///
+        /// 描画処理ここから
+        /// 
+
         // 境界線
         Novice::DrawLine(kyoukaisenStartPosX, kyoukaisenStartPosY,
             kyoukaisenEndPosX, kyoukaisenEndPosY, RED);
 
-        // ボール（2つ）
-        for (int i = 0; i < 2; i++) {
+        // ボール（10個）
+        for (int i = 0; i < ballCount; i++) {
             Novice::DrawEllipse(balls[i].x, balls[i].y, balls[i].radius, balls[i].radius,
                 0.0f, balls[i].color, kFillModeSolid);
         }
@@ -95,6 +132,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
                 openHand, 1.0f, 1.0f, 0.0f, WHITE);
         }
+
+        ///
+        /// 描画処理ここまで
+        /// 
 
         Novice::EndFrame();
 
