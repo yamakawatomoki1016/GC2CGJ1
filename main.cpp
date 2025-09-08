@@ -13,6 +13,8 @@ struct Ball {
     float speed;     // 重力による落下速度
     float vx, vy;    // スライド用の速度
     bool isFixed;    // 固定されているか
+    bool grabbed;    // 掴まれたことがあるか
+    bool exploded;   // 爆発したかどうか
 };
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -26,7 +28,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     srand((unsigned int)time(nullptr)); // 乱数の種
 
-    // ボール（黒か白をランダムで10個生成）
+    // ボール（15個生成）
     const int ballCount = 15;
     Ball balls[ballCount];
     for (int i = 0; i < ballCount; i++) {
@@ -38,6 +40,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         balls[i].vx = 0.0f;
         balls[i].vy = 0.0f;
         balls[i].isFixed = false;                  // 落下スタート
+        balls[i].grabbed = false;                  // まだ掴まれてない
+        balls[i].exploded = false;                 // 爆発してない
     }
 
     // マウス
@@ -72,7 +76,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         // ボールの落下 & 移動処理
         for (int i = 0; i < ballCount; i++) {
-            if (!balls[i].isFixed && grabbingIndex != i) {
+            if (!balls[i].isFixed && grabbingIndex != i && !balls[i].exploded) {
                 // 重力で落下
                 balls[i].y += balls[i].speed;
 
@@ -84,17 +88,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 balls[i].vx *= 0.95f;
                 balls[i].vy *= 0.95f;
 
-                // 下まで行ったら止まる
+                // 下まで行ったら止まる or 爆発
                 if (balls[i].y + balls[i].radius > 720) {
-                    balls[i].y = 720.0f - static_cast<float>(balls[i].radius);
-                    balls[i].isFixed = true;
+                    balls[i].y = 720.0f - (float)balls[i].radius;
+
+                    if (!balls[i].grabbed) {
+                        balls[i].exploded = true;   // 掴まれなかった → 爆発
+                    }
+                    else {
+                        balls[i].isFixed = true;    // 掴まれた → 固定
+                    }
+
                     balls[i].vx = balls[i].vy = 0;
                 }
 
                 // 左右の壁で跳ね返る
                 if (balls[i].x - balls[i].radius < 0) {
                     balls[i].x = (float)balls[i].radius;
-                    balls[i].vx = -balls[i].vx * 0.5f; // 少し跳ね返る
+                    balls[i].vx = -balls[i].vx * 0.5f;
                 }
                 if (balls[i].x + balls[i].radius > 1280) {
                     balls[i].x = 1280 - (float)balls[i].radius;
@@ -106,11 +117,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         // 掴む処理
         if (grabbingIndex == -1 && Novice::IsPressMouse(0)) {
             for (int i = 0; i < ballCount; i++) {
+                if (balls[i].exploded) continue; // 爆発済みは掴めない
+
                 float dx = balls[i].x - mousePosX;
                 float dy = balls[i].y - mousePosY;
                 float dist = sqrtf(dx * dx + dy * dy);
                 if (dist <= balls[i].radius + mouseRadius) {
-                    grabbingIndex = i; // このボールを掴む
+                    grabbingIndex = i;
+                    balls[i].grabbed = true; // 掴まれた記録
                     break;
                 }
             }
@@ -130,7 +144,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
             // 離したらスライド開始
             if (!Novice::IsPressMouse(0)) {
-                b.isFixed = false;  // 固定解除
+                b.isFixed = false;
                 grabbingIndex = -1;
             }
         }
@@ -147,8 +161,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         Novice::DrawLine(kyoukaisenStartPosX, kyoukaisenStartPosY,
             kyoukaisenEndPosX, kyoukaisenEndPosY, RED);
 
-        // ボール（10個）
+        // ボール描画
         for (int i = 0; i < ballCount; i++) {
+            if (balls[i].exploded) {
+                // 爆発エフェクト（赤い大きな円を一瞬描画）
+                Novice::DrawEllipse(
+                    (int)balls[i].x, (int)balls[i].y,
+                    balls[i].radius * 2, balls[i].radius * 2,
+                    0.0f, RED, kFillModeSolid
+                );
+                continue;
+            }
+
             Novice::DrawEllipse(
                 (int)balls[i].x, (int)balls[i].y,
                 balls[i].radius, balls[i].radius,
