@@ -81,6 +81,13 @@ void SpawnExplosion(Particle particles[], int maxParticles, float cx, float cy) 
     }
 }
 
+// シーン列挙型
+enum Scene {
+    TITLE,
+    GAME,
+    SCORE
+};
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Novice::Initialize(kWindowTitle, SCREEN_W, SCREEN_H);
 
@@ -134,6 +141,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 物理パラメータ
     const float gravity = 0.05f; // パーティクルや慣性に作用する重力っぽい値
 
+    // --- シーン管理用変数 ---
+    Scene scene = TITLE;
+    //int score = 0;
+
     while (Novice::ProcessMessage() == 0) {
         Novice::BeginFrame();
 
@@ -147,143 +158,173 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
         // --- 更新処理 ------------------------------------------------
 
-        // 1) ボールの更新
-        for (int i = 0; i < ballCount; i++) {
-            if (!balls[i].active) continue; 
-
-            // 掴まれているボールはマウスに追従
-            if (balls[i].beingHeld) {
-                float dx = (float)(mousePosX - prevMouseX);
-                float dy = (float)(mousePosY - prevMouseY);
-                balls[i].vx = dx;
-                balls[i].vy = dy;
-
-                balls[i].x = (float)mousePosX;
-                balls[i].y = (float)mousePosY;
+        switch (scene)
+        {
+        case TITLE:///////////////////////////////////////////////////////////////////
+            if (keys[DIK_SPACE] && preKeys[DIK_SPACE] == 0) {
+                scene = GAME;
             }
-            else if (!balls[i].isFixed && !balls[i].exploded) {
-              
-                balls[i].vy += gravity * 0.16f; 
-                balls[i].y += balls[i].speed + balls[i].vy;
-                balls[i].x += balls[i].vx;
+            break;
+        case GAME:///////////////////////////////////////////////////////////////////
+            // 1) ボールの更新
+            for (int i = 0; i < ballCount; i++) {
+                if (!balls[i].active) continue;
 
-                // 減速（摩擦）
-                balls[i].vx *= 0.98f;
-                balls[i].vy *= 0.99f;
+                // 掴まれているボールはマウスに追従
+                if (balls[i].beingHeld) {
+                    float dx = (float)(mousePosX - prevMouseX);
+                    float dy = (float)(mousePosY - prevMouseY);
+                    balls[i].vx = dx;
+                    balls[i].vy = dy;
 
-                // 地面に着いたら判定
-                if (balls[i].y + balls[i].radius >= SCREEN_H) {
-                    balls[i].y = SCREEN_H - balls[i].radius;
+                    balls[i].x = (float)mousePosX;
+                    balls[i].y = (float)mousePosY;
+                }
+                else if (!balls[i].isFixed && !balls[i].exploded) {
 
-                    if (!balls[i].touched) {
-                        // 一度も掴まれていなければ爆発させる
-                        balls[i].exploded = true;
-                        balls[i].active = false; // ボール自体は消す（爆発で破片表示）
-                        // 爆発パーティクルを生成
-                        SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
+                    balls[i].vy += gravity * 0.16f;
+                    balls[i].y += balls[i].speed + balls[i].vy;
+                    balls[i].x += balls[i].vx;
+
+                    // 減速（摩擦）
+                    balls[i].vx *= 0.98f;
+                    balls[i].vy *= 0.99f;
+
+                    // 地面に着いたら判定
+                    if (balls[i].y + balls[i].radius >= SCREEN_H) {
+                        balls[i].y = SCREEN_H - balls[i].radius;
+
+                        if (!balls[i].touched) {
+                            // 一度も掴まれていなければ爆発させる
+                            balls[i].exploded = true;
+                            balls[i].active = false; // ボール自体は消す（爆発で破片表示）
+                            // 爆発パーティクルを生成
+                            SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
+                        }
+                        else {
+                            // 掴まれたことがあるなら普通に床で止める
+                            balls[i].isFixed = true;
+                            balls[i].vx = balls[i].vy = 0.0f;
+                        }
                     }
-                    else {
-                        // 掴まれたことがあるなら普通に床で止める
-                        balls[i].isFixed = true;
-                        balls[i].vx = balls[i].vy = 0.0f;
+
+                    // 壁の当たり判定（左右）
+                    if (balls[i].x - balls[i].radius < 0.0f) {
+                        balls[i].x = balls[i].radius;
+                        balls[i].vx = -balls[i].vx * 0.5f;
+                    }
+                    if (balls[i].x + balls[i].radius > SCREEN_W) {
+                        balls[i].x = SCREEN_W - balls[i].radius;
+                        balls[i].vx = -balls[i].vx * 0.5f;
                     }
                 }
-
-                // 壁の当たり判定（左右）
-                if (balls[i].x - balls[i].radius < 0.0f) {
-                    balls[i].x = balls[i].radius;
-                    balls[i].vx = -balls[i].vx * 0.5f;
-                }
-                if (balls[i].x + balls[i].radius > SCREEN_W) {
-                    balls[i].x = SCREEN_W - balls[i].radius;
-                    balls[i].vx = -balls[i].vx * 0.5f;
-                }
             }
-        }
 
-        // 2) マウス入力（掴む/離すの判定）
-        if (!prevMouseDown && mouseDown) {
-            for (int i = ballCount - 1; i >= 0; i--) {
-                if (!balls[i].active || balls[i].exploded || balls[i].touched) continue;
-                float dx = balls[i].x - (float)mousePosX;
-                float dy = balls[i].y - (float)mousePosY;
-                float dist2 = dx * dx + dy * dy;
-                if (dist2 <= (balls[i].radius + mouseRadius) * (balls[i].radius + mouseRadius)) {
-                    grabbingIndex = i;
-                    balls[i].beingHeld = true;
-                    balls[i].touched = true;
-                    prevMouseX = mousePosX;
-                    prevMouseY = mousePosY;
-                    break;
+            // 2) マウス入力（掴む/離すの判定）
+            if (!prevMouseDown && mouseDown) {
+                for (int i = ballCount - 1; i >= 0; i--) {
+                    if (!balls[i].active || balls[i].exploded || balls[i].touched) continue;
+                    float dx = balls[i].x - (float)mousePosX;
+                    float dy = balls[i].y - (float)mousePosY;
+                    float dist2 = dx * dx + dy * dy;
+                    if (dist2 <= (balls[i].radius + mouseRadius) * (balls[i].radius + mouseRadius)) {
+                        grabbingIndex = i;
+                        balls[i].beingHeld = true;
+                        balls[i].touched = true;
+                        prevMouseX = mousePosX;
+                        prevMouseY = mousePosY;
+                        break;
+                    }
                 }
             }
-        }
-        else if (prevMouseDown && !mouseDown) {
-            if (grabbingIndex != -1) {
-                Ball& b = balls[grabbingIndex];
-                b.beingHeld = false;
-                b.vx *= 1.2f;
-                b.vy *= 1.2f;
-                grabbingIndex = -1;
-            }
-        }
-
-        // 3) パーティクル更新
-        for (int i = 0; i < maxParticles; i++) {
-            if (!particles[i].active) continue;
-            // 重力
-            particles[i].vy += gravity;
-            particles[i].x += particles[i].vx;
-            particles[i].y += particles[i].vy;
-
-            // 徐々に減速させる
-            particles[i].vx *= 0.995f;
-            particles[i].vy *= 0.995f;
-
-            // 寿命を減らす
-            particles[i].life--;
-            if (particles[i].life <= 0) {
-                particles[i].active = false;
+            else if (prevMouseDown && !mouseDown) {
+                if (grabbingIndex != -1) {
+                    Ball& b = balls[grabbingIndex];
+                    b.beingHeld = false;
+                    b.vx *= 1.2f;
+                    b.vy *= 1.2f;
+                    grabbingIndex = -1;
+                }
             }
 
-            // 床に当たったら跳ねて減速させる（簡易）
-            if (particles[i].y + particles[i].size >= SCREEN_H) {
-                particles[i].y = SCREEN_H - particles[i].size;
-                particles[i].vy *= -0.4f;
-                particles[i].vx *= 0.6f;
+            // 3) パーティクル更新
+            for (int i = 0; i < maxParticles; i++) {
+                if (!particles[i].active) continue;
+                // 重力
+                particles[i].vy += gravity;
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+
+                // 徐々に減速させる
+                particles[i].vx *= 0.995f;
+                particles[i].vy *= 0.995f;
+
+                // 寿命を減らす
+                particles[i].life--;
+                if (particles[i].life <= 0) {
+                    particles[i].active = false;
+                }
+
+                // 床に当たったら跳ねて減速させる（簡易）
+                if (particles[i].y + particles[i].size >= SCREEN_H) {
+                    particles[i].y = SCREEN_H - particles[i].size;
+                    particles[i].vy *= -0.4f;
+                    particles[i].vx *= 0.6f;
+                }
             }
+            break;
+        case SCORE:///////////////////////////////////////////////////////////////////
+            if (keys[DIK_SPACE] && preKeys[DIK_SPACE] == 0) {
+                scene = TITLE;
+            }
+            break;
         }
+
+        // --- 更新処理 ------------------------------------------------
+        
 
         // --- 描画処理 ------------------------------------------------
 
-        // 境界線（任意）
-        Novice::DrawLine(SCREEN_W / 2, 0, SCREEN_W / 2, SCREEN_H, RED);
+        switch (scene)
+        {
+        case TITLE:
+            break;
+        case GAME:
+            // 境界線（任意）
+            Novice::DrawLine(SCREEN_W / 2, 0, SCREEN_W / 2, SCREEN_H, RED);
 
-        for (int i = 0; i < maxParticles; i++) {
-            if (!particles[i].active) continue;
-            float t = particles[i].life / (float)particles[i].lifeMax;
-            int drawSize = (int)std::max(1.0f, particles[i].size * t);
-            Novice::DrawEllipse((int)particles[i].x, (int)particles[i].y,
-                drawSize, drawSize, 0.0f, particles[i].color, kFillModeSolid);
+            for (int i = 0; i < maxParticles; i++) {
+                if (!particles[i].active) continue;
+                float t = particles[i].life / (float)particles[i].lifeMax;
+                int drawSize = (int)std::max(1.0f, particles[i].size * t);
+                Novice::DrawEllipse((int)particles[i].x, (int)particles[i].y,
+                    drawSize, drawSize, 0.0f, particles[i].color, kFillModeSolid);
+            }
+
+            // ボールを描画
+            for (int i = 0; i < ballCount; i++) {
+                if (!balls[i].active) continue;
+                Novice::DrawEllipse((int)balls[i].x, (int)balls[i].y,
+                    (int)balls[i].radius, (int)balls[i].radius,
+                    0.0f, balls[i].color, kFillModeSolid);
+            }
+
+            // 手の描画
+            if (mouseDown) {
+                Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
+                    closeHand, 1.0f, 1.0f, 0.0f, WHITE);
+            }
+            else {
+                Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
+                    openHand, 1.0f, 1.0f, 0.0f, WHITE);
+            }
+
+            break;
+        case SCORE:
+            break;
         }
 
-        // ボールを描画
-        for (int i = 0; i < ballCount; i++) {
-            if (!balls[i].active) continue;
-            Novice::DrawEllipse((int)balls[i].x, (int)balls[i].y,
-                (int)balls[i].radius, (int)balls[i].radius,
-                0.0f, balls[i].color, kFillModeSolid);
-        }
-
-        // 手の描画
-        if (mouseDown) {
-            Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
-                closeHand, 1.0f, 1.0f, 0.0f, WHITE);
-        }
-        else {
-            Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
-                openHand, 1.0f, 1.0f, 0.0f, WHITE);
-        }
+        // --- 描画処理 ------------------------------------------------
 
         Novice::EndFrame();
 
