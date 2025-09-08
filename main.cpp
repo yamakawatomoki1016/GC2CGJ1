@@ -27,7 +27,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     srand((unsigned int)time(nullptr)); // 乱数の種
 
     // ボール（黒か白をランダムで10個生成）
-    const int ballCount = 10;
+    const int ballCount = 15;
     Ball balls[ballCount];
     for (int i = 0; i < ballCount; i++) {
         balls[i].x = 640.0f;                       // 画面中央
