@@ -204,6 +204,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     int gameTimer = 0;
     bool gameStart = false;
 
+    //残機
     int lives;
 
     InitGame(balls, ballCount, particles, maxParticles, missCount);
