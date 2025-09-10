@@ -412,7 +412,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
         }
 
-
         // --- 更新処理 ------------------------------------------------
         
 
@@ -533,6 +532,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             for (int i = 0; i < 3; ++i) {
                 Novice::DrawSprite(450 + i * 85, 360, numGH[numArray[i]], 2.5f, 2.5f, 0.0f, WHITE);
             }
+            Novice::DrawSprite(480 + 3 * 85 + 20, 400 + 60, pt, 2.0f, 2.0f, 0.0f, WHITE);
 
             // 左側にランキング表示
             for (int rank = 0; rank < 3; ++rank) {
