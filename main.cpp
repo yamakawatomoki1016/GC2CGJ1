@@ -489,15 +489,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             break;
         case SCORE:
         {
-            // 現在のスコアを追加して一時配列にコピー
             int temp[4] = { highScores[0], highScores[1], highScores[2], score };
 
-            // 降順ソート
             std::sort(temp, temp + 4, std::greater<int>());
 
             // 重複を除いて上位3位に反映
             int idx = 0;
-            int lastScore = -1; // 初期値は存在しない値
+            int lastScore = -1;
             for (int i = 0; i < 4 && idx < 3; ++i) {
                 if (temp[i] != lastScore) {
                     highScores[idx++] = temp[i];
