@@ -233,7 +233,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     int lives;
     int numArray[3] = {};
     int hiScore = 0;
-
+    // --- グローバル変数 ---
+    int highScores[3] = { 0, 0, 0 }; // 上位3位のスコア
     InitGame(balls, ballCount, particles, maxParticles, missCount);
 
     while (Novice::ProcessMessage() == 0) {
@@ -487,15 +488,47 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
             break;
         case SCORE:
+        {
+            // 現在のスコアを追加して一時配列にコピー
+            int temp[4] = { highScores[0], highScores[1], highScores[2], score };
+
+            // 降順ソート
+            std::sort(temp, temp + 4, std::greater<int>());
+
+            // 重複を除いて上位3位に反映
+            int idx = 0;
+            int lastScore = -1; // 初期値は存在しない値
+            for (int i = 0; i < 4 && idx < 3; ++i) {
+                if (temp[i] != lastScore) {
+                    highScores[idx++] = temp[i];
+                    lastScore = temp[i];
+                }
+            }
+
+            // 空いた順位は0にしておく
+            for (; idx < 3; ++idx) {
+                highScores[idx] = 0;
+            }
+
             Novice::DrawSprite(0, 0, result, 1.0f, 1.0f, 0.0f, WHITE);
 
+            // 現スコアを描画
             SplitScoreToDigits(score, numArray, 3);
-
-            // 数字を描画
             for (int i = 0; i < 3; ++i) {
                 Novice::DrawSprite(450 + i * 85, 360, numGH[numArray[i]], 2.5f, 2.5f, 0.0f, WHITE);
             }
-            break;
+
+            // 左側にランキング表示
+            for (int rank = 0; rank < 3; ++rank) {
+                if (highScores[rank] == 0) continue; // 空白なら描画しない
+                int digits[3];
+                SplitScoreToDigits(highScores[rank], digits, 3);
+                for (int i = 0; i < 3; ++i) {
+                    Novice::DrawSprite(50 + i * 60, 120 + rank * 100, numGH[digits[i]], 2.0f, 2.0f, 0.0f, WHITE);
+                }
+            }
+        }
+        break;
         }
 
         // --- 描画処理 ------------------------------------------------
