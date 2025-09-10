@@ -14,18 +14,19 @@ const char kWindowTitle[] = "白黒ボムパニック！";
 const int SCREEN_W = 1280;
 const int SCREEN_H = 720;
 
+// ボール構造体
 struct Ball {
     float x, y;
     float radius;
-    int color;  
-    int image;   // ← 追加（描画用）
-    float speed;
-    float vx, vy;
-    bool isFixed;
-    bool beingHeld;
-    bool touched;
-    bool exploded;
-    bool active;
+    unsigned int color;
+    int image;
+    float speed;     // 自動落下速度
+    float vx, vy;    // 慣性速度
+    bool isFixed;    // 地面で固定されているか
+    bool beingHeld;  // 今掴んでいるか
+    bool touched;    // 一度でも掴まれたか（掴まれたことがあるなら true）
+    bool exploded;   // 爆発処理を行ったか
+    bool active;     // 存在するか（爆発で消したい場合 false にする）
 };
 
 // パーティクル（爆発の破片）
@@ -34,7 +35,7 @@ struct Particle {
     float vx, vy;
     float size;
     int life;        // 残フレーム
-    int lifeMax;   
+    int lifeMax;
     unsigned int color;
     bool active;
 };
@@ -101,8 +102,6 @@ void InitGame(Ball balls[], int ballCount, Particle particles[], int maxParticle
         balls[i].x = SCREEN_W / 2.0f;
         balls[i].y = -i * 150.0f;
         balls[i].radius = 30.0f;
-        balls[i].speed = float(3 + rand() % 3);
-
         if (rand() % 2 == 0) {
             balls[i].color = WHITE;          // ← 判定用
             balls[i].image = whiteBallGH;    // ← 描画用
@@ -111,7 +110,7 @@ void InitGame(Ball balls[], int ballCount, Particle particles[], int maxParticle
             balls[i].color = BLACK;          // ← 判定用
             balls[i].image = blackBallGH;    // ← 描画用
         }
-
+        balls[i].speed = float(3 + rand() % 3); // 3〜5
         balls[i].vx = 0.0f;
         balls[i].vy = 0.0f;
         balls[i].isFixed = false;
@@ -120,18 +119,31 @@ void InitGame(Ball balls[], int ballCount, Particle particles[], int maxParticle
         balls[i].exploded = false;
         balls[i].active = true;
     }
-
     // パーティクル初期化
     for (int i = 0; i < maxParticles; i++) {
         particles[i].active = false;
     }
-
     // ミス回数リセット
     missCount = 0;
 }
 
+void SplitScoreToDigits(int score, int digits[], int maxDigits) {
+    for (int i = maxDigits - 1; i >= 0; i--) {
+        digits[i] = score % 10;
+        score /= 10;
+    }
+}
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-    Novice::Initialize(kWindowTitle, SCREEN_W, SCREEN_H);
+    // ライブラリの初期化
+    Novice::Initialize(kWindowTitle, 1280, 720);
+    // 乱数のシードを初期化
+    srand((unsigned int)time(NULL));
+    // フルスクリーンにする
+    HWND hwnd = GetForegroundWindow(); // 現在のウィンドウのハンドルを取得
+    SetWindowLong(hwnd, GWL_STYLE, GetWindowLong(hwnd, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW); // ウィンドウのスタイルを変更
+    SetWindowPos(hwnd, HWND_TOP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), SWP_FRAMECHANGED | SWP_NOZORDER | SWP_SHOWWINDOW); // ウィンドウ位置とサイズをフルスクリーンに設定
+    ShowWindow(hwnd, SW_MAXIMIZE); // ウィンドウを最大化
 
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
@@ -139,9 +151,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 手の画像（あるなら）
     int openHand = Novice::LoadTexture("./Resources./openHand.png");
     int closeHand = Novice::LoadTexture("./Resources./closeHand.png");
-    whiteBallGH = Novice::LoadTexture("./Resources/whiteBomb1.png");//白
-    blackBallGH = Novice::LoadTexture("./Resources/blackBomb1.png");//黒
-    int lifeIcon = Novice::LoadTexture("./Resources/blackBomb1.png");//残機
+    int title = Novice::LoadTexture("./Resources./title.png");
+    int gameScene = Novice::LoadTexture("./Resources./gameScene.png");
+    int result = Novice::LoadTexture("./Resources./result.png");
+    whiteBallGH = Novice::LoadTexture("./Resources/whiteBomb.png");//白
+    blackBallGH = Novice::LoadTexture("./Resources/blackBomb.png");//黒
+    int lifeIcon = Novice::LoadTexture("./Resources/hp.png");//残機
+
+    int numGH[10] = {};
+    numGH[0] = Novice::LoadTexture("./Resources./0.png");
+    numGH[1] = Novice::LoadTexture("./Resources./1.png");
+    numGH[2] = Novice::LoadTexture("./Resources./2.png");
+    numGH[3] = Novice::LoadTexture("./Resources./3.png");
+    numGH[4] = Novice::LoadTexture("./Resources./4.png");
+    numGH[5] = Novice::LoadTexture("./Resources./5.png");
+    numGH[6] = Novice::LoadTexture("./Resources./6.png");
+    numGH[7] = Novice::LoadTexture("./Resources./7.png");
+    numGH[8] = Novice::LoadTexture("./Resources./8.png");
+    numGH[9] = Novice::LoadTexture("./Resources./9.png");
+
+    int gamaSceneBGM = Novice::LoadAudio("./Sound./gamaSceneBGM.mp3");
 
     srand((unsigned int)time(nullptr));
 
@@ -156,12 +185,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         particles[i].active = false;
     }
 
-    // ボール初期化
+    // ボール初期化（上から落ちてくるイメージ）
     for (int i = 0; i < ballCount; i++) {
         balls[i].x = SCREEN_W / 2.0f;
         balls[i].y = -i * 150.0f;
         balls[i].radius = 30.0f;
-        balls[i].speed = float(3 + rand() % 3);
 
         if (rand() % 2 == 0) {
             balls[i].color = WHITE;          // ← 判定用
@@ -172,15 +200,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             balls[i].image = blackBallGH;    // ← 描画用
         }
 
+        balls[i].speed = float(3 + rand() % 3); // 3〜5
         balls[i].vx = 0.0f;
         balls[i].vy = 0.0f;
         balls[i].isFixed = false;
         balls[i].beingHeld = false;
-        balls[i].touched = false;
+        balls[i].touched = false; // 一度も掴まれていない
         balls[i].exploded = false;
         balls[i].active = true;
     }
-
     // マウス
     int mousePosX = 0;
     int mousePosY = 0;
@@ -188,13 +216,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     int prevMouseY = 0;
     bool prevMouseDown = false;
     int mouseRadius = 15;
-
     // 掴んでいるボールのインデックス
     int grabbingIndex = -1;
-
     // 物理パラメータ
     const float gravity = 0.05f; // パーティクルや慣性に作用する重力っぽい値
-
     // --- シーン管理用変数 ---
     Scene scene = TITLE;
     int score = 0;
@@ -203,9 +228,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // ゲーム開始時のカウントダウン用
     int gameTimer = 0;
     bool gameStart = false;
-
+    int playHandle = 1;
     //残機
     int lives;
+    int numArray[3] = {};
+    int hiScore = 0;
 
     InitGame(balls, ballCount, particles, maxParticles, missCount);
 
@@ -230,6 +257,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 gameTimer = 0;
                 gameStart = false;
                 scene = GAME;
+                if (!Novice::IsPlayingAudio(playHandle)) {
+                    playHandle = Novice::PlayAudio(gamaSceneBGM, true, 1);
+                }
             }
             break;
         case GAME:///////////////////////////////////////////////////////////////////
@@ -267,6 +297,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                         // 地面に着いたら判定
                         if (balls[i].y + balls[i].radius >= SCREEN_H) {
                             balls[i].y = SCREEN_H - balls[i].radius;
+
                             if (!balls[i].touched) {
                                 // 一度も掴まれていなければ爆発
                                 balls[i].exploded = true;
@@ -274,6 +305,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                 SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
                                 missCount++;
                                 if (missCount >= maxMiss) {
+                                    Novice::StopAudio(playHandle);
                                     scene = SCORE; // 3回ミスで終了
                                 }
                             }
@@ -293,6 +325,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                 else {
                                     missCount++;
                                     if (missCount >= maxMiss) {
+                                        Novice::StopAudio(playHandle);
                                         scene = SCORE;
                                     }
                                 }
@@ -368,7 +401,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                     }
                 }
             }
-
             break;
         case SCORE:///////////////////////////////////////////////////////////////////
             if (keys[DIK_SPACE] && preKeys[DIK_SPACE] == 0) {
@@ -378,6 +410,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
         }
 
+
         // --- 更新処理 ------------------------------------------------
         
 
@@ -386,8 +419,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         switch (scene)
         {
         case TITLE:
+            Novice::DrawSprite(0, 0, title, 1.0f, 1.0f, 0.0f, WHITE);
+
+            score = 0;
             break;
         case GAME:
+            Novice::DrawSprite(0, 0, gameScene, 1.0f, 1.0f, 0.0f, WHITE);
             // 境界線（任意）
             Novice::DrawLine(SCREEN_W / 2, 0, SCREEN_W / 2, SCREEN_H, RED);
 
@@ -407,7 +444,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                         int(balls[i].x - balls[i].radius), // 左上X
                         int(balls[i].y - balls[i].radius), // 左上Y
                         balls[i].image,
-                        2.0f, 2.0f, 0.0f, WHITE
+                        1.0f, 1.0f, 0.0f, WHITE
                     );
                 }
             }
@@ -421,6 +458,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
                     openHand, 1.0f, 1.0f, 0.0f, WHITE);
             }
+
             lives = maxMiss - missCount;
             for (int i = 0; i < lives; i++) {
                 Novice::DrawSprite(
@@ -432,9 +470,31 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                     WHITE          // 色
                 );
             }
-            Novice::ScreenPrintf(1000,30,"%d", score);
+
+            if (gameTimer >= 0 && gameTimer < 60) {
+                Novice::DrawSprite(550, 50, numGH[3], 2.0f, 2.0f, 0.0f, WHITE);
+            }
+            else if (gameTimer >= 60 && gameTimer < 120) {
+                Novice::DrawSprite(550, 50, numGH[2], 2.0f, 2.0f, 0.0f, WHITE);
+            }
+            else if (gameTimer >= 120 && gameTimer < 180) {
+                Novice::DrawSprite(550, 50, numGH[1], 2.0f, 2.0f, 0.0f, WHITE);
+            }
+
+            if (score <= hiScore) {
+                hiScore = score;
+            }
+
             break;
         case SCORE:
+            Novice::DrawSprite(0, 0, result, 1.0f, 1.0f, 0.0f, WHITE);
+
+            SplitScoreToDigits(score, numArray, 3);
+
+            // 数字を描画
+            for (int i = 0; i < 3; ++i) {
+                Novice::DrawSprite(450 + i * 85, 360, numGH[numArray[i]], 2.5f, 2.5f, 0.0f, WHITE);
+            }
             break;
         }
 
