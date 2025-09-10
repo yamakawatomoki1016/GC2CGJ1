@@ -205,7 +205,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
             break;
         case GAME:///////////////////////////////////////////////////////////////////
-
             //ゲーム開始タイマー（３秒）
             gameTimer++;
             if (gameTimer >= 180) {
@@ -246,6 +245,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                 balls[i].exploded = true;
                                 balls[i].active = false;
                                 SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
+                                missCount++;
+                                if (missCount >= maxMiss) {
+                                    scene = SCORE; // 3回ミスで終了
+                                }
                             }
                             else {
                                 // --- 仕分け判定を追加 ---
