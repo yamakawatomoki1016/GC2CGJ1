@@ -141,6 +141,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     int closeHand = Novice::LoadTexture("./Resources./closeHand.png");
     whiteBallGH = Novice::LoadTexture("./Resources/whiteBomb1.png");//白
     blackBallGH = Novice::LoadTexture("./Resources/blackBomb1.png");//黒
+    int lifeIcon = Novice::LoadTexture("./Resources/blackBomb1.png");//残機
 
     srand((unsigned int)time(nullptr));
 
@@ -202,6 +203,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // ゲーム開始時のカウントダウン用
     int gameTimer = 0;
     bool gameStart = false;
+
+    int lives;
 
     InitGame(balls, ballCount, particles, maxParticles, missCount);
 
@@ -416,6 +419,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             else {
                 Novice::DrawSprite(mousePosX - mouseRadius, mousePosY - mouseRadius,
                     openHand, 1.0f, 1.0f, 0.0f, WHITE);
+            }
+            lives = maxMiss - missCount;
+            for (int i = 0; i < lives; i++) {
+                Novice::DrawSprite(
+                    20 + i * 40,   // X座標（横に並べる）
+                    20,            // Y座標（固定）
+                    lifeIcon,      // 残機画像
+                    1.0f, 1.0f,    // 拡大率
+                    0.0f,          // 回転
+                    WHITE          // 色
+                );
             }
 
             break;
