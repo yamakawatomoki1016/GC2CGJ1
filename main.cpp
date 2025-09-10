@@ -14,18 +14,18 @@ const char kWindowTitle[] = "白黒ボムパニック！";
 const int SCREEN_W = 1280;
 const int SCREEN_H = 720;
 
-// ボール構造体
 struct Ball {
     float x, y;
     float radius;
-    unsigned int color;
-    float speed;     // 自動落下速度
-    float vx, vy;    // 慣性速度
-    bool isFixed;    // 地面で固定されているか
-    bool beingHeld;  // 今掴んでいるか
-    bool touched;    // 一度でも掴まれたか（掴まれたことがあるなら true）
-    bool exploded;   // 爆発処理を行ったか
-    bool active;     // 存在するか（爆発で消したい場合 false にする）
+    int color;  
+    int image;   // ← 追加（描画用）
+    float speed;
+    float vx, vy;
+    bool isFixed;
+    bool beingHeld;
+    bool touched;
+    bool exploded;
+    bool active;
 };
 
 // パーティクル（爆発の破片）
@@ -91,14 +91,27 @@ enum Scene {
 // ----------------------------
 // 初期化処理関数
 // ----------------------------
+
+int whiteBallGH;
+int blackBallGH;
+
 void InitGame(Ball balls[], int ballCount, Particle particles[], int maxParticles, int& missCount) {
     // ボール初期化
     for (int i = 0; i < ballCount; i++) {
         balls[i].x = SCREEN_W / 2.0f;
         balls[i].y = -i * 150.0f;
         balls[i].radius = 30.0f;
-        balls[i].color = (rand() % 2 == 0) ? BLACK : WHITE;
-        balls[i].speed = float(3 + rand() % 3); // 3〜5
+        balls[i].speed = float(3 + rand() % 3);
+
+        if (rand() % 2 == 0) {
+            balls[i].color = WHITE;          // ← 判定用
+            balls[i].image = whiteBallGH;    // ← 描画用
+        }
+        else {
+            balls[i].color = BLACK;          // ← 判定用
+            balls[i].image = blackBallGH;    // ← 描画用
+        }
+
         balls[i].vx = 0.0f;
         balls[i].vy = 0.0f;
         balls[i].isFixed = false;
@@ -126,6 +139,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 手の画像（あるなら）
     int openHand = Novice::LoadTexture("./Resources./openHand.png");
     int closeHand = Novice::LoadTexture("./Resources./closeHand.png");
+    whiteBallGH = Novice::LoadTexture("./Resources/whiteBomb1.png");//白
+    blackBallGH = Novice::LoadTexture("./Resources/blackBomb1.png");//黒
 
     srand((unsigned int)time(nullptr));
 
@@ -140,18 +155,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         particles[i].active = false;
     }
 
-    // ボール初期化（上から落ちてくるイメージ）
+    // ボール初期化
     for (int i = 0; i < ballCount; i++) {
         balls[i].x = SCREEN_W / 2.0f;
         balls[i].y = -i * 150.0f;
         balls[i].radius = 30.0f;
-        balls[i].color = (rand() % 2 == 0) ? BLACK : WHITE;
-        balls[i].speed = float(3 + rand() % 3); // 3〜5
+        balls[i].speed = float(3 + rand() % 3);
+
+        if (rand() % 2 == 0) {
+            balls[i].color = WHITE;          // ← 判定用
+            balls[i].image = whiteBallGH;    // ← 描画用
+        }
+        else {
+            balls[i].color = BLACK;          // ← 判定用
+            balls[i].image = blackBallGH;    // ← 描画用
+        }
+
         balls[i].vx = 0.0f;
         balls[i].vy = 0.0f;
         balls[i].isFixed = false;
         balls[i].beingHeld = false;
-        balls[i].touched = false; // 一度も掴まれていない
+        balls[i].touched = false;
         balls[i].exploded = false;
         balls[i].active = true;
     }
@@ -373,10 +397,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
             // ボールを描画
             for (int i = 0; i < ballCount; i++) {
-                if (!balls[i].active) continue;
-                Novice::DrawEllipse((int)balls[i].x, (int)balls[i].y,
-                    (int)balls[i].radius, (int)balls[i].radius,
-                    0.0f, balls[i].color, kFillModeSolid);
+                // ボール描画
+                if (balls[i].active) {
+                    Novice::DrawSprite(
+                        int(balls[i].x - balls[i].radius), // 左上X
+                        int(balls[i].y - balls[i].radius), // 左上Y
+                        balls[i].image,
+                        2.0f, 2.0f, 0.0f, WHITE
+                    );
+                }
             }
 
             // 手の描画
