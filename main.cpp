@@ -88,6 +88,35 @@ enum Scene {
     SCORE
 };
 
+// ----------------------------
+// 初期化処理関数
+// ----------------------------
+void InitGame(Ball balls[], int ballCount, Particle particles[], int maxParticles, int& missCount) {
+    // ボール初期化
+    for (int i = 0; i < ballCount; i++) {
+        balls[i].x = SCREEN_W / 2.0f;
+        balls[i].y = -i * 150.0f;
+        balls[i].radius = 30.0f;
+        balls[i].color = (rand() % 2 == 0) ? BLACK : WHITE;
+        balls[i].speed = float(3 + rand() % 3); // 3〜5
+        balls[i].vx = 0.0f;
+        balls[i].vy = 0.0f;
+        balls[i].isFixed = false;
+        balls[i].beingHeld = false;
+        balls[i].touched = false;
+        balls[i].exploded = false;
+        balls[i].active = true;
+    }
+
+    // パーティクル初期化
+    for (int i = 0; i < maxParticles; i++) {
+        particles[i].active = false;
+    }
+
+    // ミス回数リセット
+    missCount = 0;
+}
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     Novice::Initialize(kWindowTitle, SCREEN_W, SCREEN_H);
 
@@ -101,7 +130,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     srand((unsigned int)time(nullptr));
 
     // ボール数
-    const int ballCount = 15;
+    const int ballCount = 100;
     Ball balls[ballCount];
 
     // パーティクル配列（十分な数）
@@ -144,6 +173,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // --- シーン管理用変数 ---
     Scene scene = TITLE;
     //int score = 0;
+    int missCount = 0;   // ミスした回数
+    const int maxMiss = 3;
+    // ゲーム開始時のカウントダウン用
+    int gameTimer = 0;
+    bool gameStart = false;
+
+    InitGame(balls, ballCount, particles, maxParticles, missCount);
 
     while (Novice::ProcessMessage() == 0) {
         Novice::BeginFrame();
@@ -162,122 +198,153 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         {
         case TITLE:///////////////////////////////////////////////////////////////////
             if (keys[DIK_SPACE] && preKeys[DIK_SPACE] == 0) {
+                InitGame(balls, ballCount, particles, maxParticles, missCount);
+                gameTimer = 0;
+                gameStart = false;
                 scene = GAME;
             }
             break;
         case GAME:///////////////////////////////////////////////////////////////////
-            // 1) ボールの更新
-            for (int i = 0; i < ballCount; i++) {
-                if (!balls[i].active) continue;
 
-                // 掴まれているボールはマウスに追従
-                if (balls[i].beingHeld) {
-                    float dx = (float)(mousePosX - prevMouseX);
-                    float dy = (float)(mousePosY - prevMouseY);
-                    balls[i].vx = dx;
-                    balls[i].vy = dy;
+            //ゲーム開始タイマー（３秒）
+            gameTimer++;
+            if (gameTimer >= 180) {
+                gameStart = true;
+            }
+            //ゲーム開始
+            if (gameStart == true) {
+                // 1) ボールの更新
+                for (int i = 0; i < ballCount; i++) {
+                    if (!balls[i].active) continue;
 
-                    balls[i].x = (float)mousePosX;
-                    balls[i].y = (float)mousePosY;
-                }
-                else if (!balls[i].isFixed && !balls[i].exploded) {
+                    // 掴まれているボールはマウスに追従
+                    if (balls[i].beingHeld) {
+                        float dx = (float)(mousePosX - prevMouseX);
+                        float dy = (float)(mousePosY - prevMouseY);
+                        balls[i].vx = dx;
+                        balls[i].vy = dy;
 
-                    balls[i].vy += gravity * 0.16f;
-                    balls[i].y += balls[i].speed + balls[i].vy;
-                    balls[i].x += balls[i].vx;
+                        balls[i].x = (float)mousePosX;
+                        balls[i].y = (float)mousePosY;
+                    }
+                    else if (!balls[i].isFixed && !balls[i].exploded) {
 
-                    // 減速（摩擦）
-                    balls[i].vx *= 0.98f;
-                    balls[i].vy *= 0.99f;
+                        balls[i].vy += gravity * 0.16f;
+                        balls[i].y += balls[i].speed + balls[i].vy;
+                        balls[i].x += balls[i].vx;
 
-                    // 地面に着いたら判定
-                    if (balls[i].y + balls[i].radius >= SCREEN_H) {
-                        balls[i].y = SCREEN_H - balls[i].radius;
+                        // 減速（摩擦）
+                        balls[i].vx *= 0.98f;
+                        balls[i].vy *= 0.99f;
 
-                        if (!balls[i].touched) {
-                            // 一度も掴まれていなければ爆発させる
-                            balls[i].exploded = true;
-                            balls[i].active = false; // ボール自体は消す（爆発で破片表示）
-                            // 爆発パーティクルを生成
-                            SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
+                        // 地面に着いたら判定
+                        if (balls[i].y + balls[i].radius >= SCREEN_H) {
+                            balls[i].y = SCREEN_H - balls[i].radius;
+
+                            if (!balls[i].touched) {
+                                // 一度も掴まれていなければ爆発
+                                balls[i].exploded = true;
+                                balls[i].active = false;
+                                SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
+                            }
+                            else {
+                                // --- 仕分け判定を追加 ---
+                                bool correct = false;
+                                if (balls[i].color == WHITE && balls[i].x > SCREEN_W / 2) {
+                                    correct = true; // 白は右
+                                }
+                                if (balls[i].color == BLACK && balls[i].x < SCREEN_W / 2) {
+                                    correct = true; // 黒は左
+                                }
+
+                                if (!correct) {
+                                    // ミス → カウントを増やす
+                                    missCount++;
+                                    if (missCount >= maxMiss) {
+                                        // 3回ミスで終了
+                                        scene = SCORE;
+                                    }
+                                }
+
+                                // 正解でも不正解でも床で止める
+                                balls[i].isFixed = true;
+                                balls[i].vx = balls[i].vy = 0.0f;
+                            }
                         }
-                        else {
-                            // 掴まれたことがあるなら普通に床で止める
-                            balls[i].isFixed = true;
-                            balls[i].vx = balls[i].vy = 0.0f;
+
+                        // 壁の当たり判定（左右）
+                        if (balls[i].x - balls[i].radius < 0.0f) {
+                            balls[i].x = balls[i].radius;
+                            balls[i].vx = -balls[i].vx * 0.5f;
+                        }
+                        if (balls[i].x + balls[i].radius > SCREEN_W) {
+                            balls[i].x = SCREEN_W - balls[i].radius;
+                            balls[i].vx = -balls[i].vx * 0.5f;
                         }
                     }
-
-                    // 壁の当たり判定（左右）
-                    if (balls[i].x - balls[i].radius < 0.0f) {
-                        balls[i].x = balls[i].radius;
-                        balls[i].vx = -balls[i].vx * 0.5f;
-                    }
-                    if (balls[i].x + balls[i].radius > SCREEN_W) {
-                        balls[i].x = SCREEN_W - balls[i].radius;
-                        balls[i].vx = -balls[i].vx * 0.5f;
-                    }
                 }
-            }
 
-            // 2) マウス入力（掴む/離すの判定）
-            if (!prevMouseDown && mouseDown) {
-                for (int i = ballCount - 1; i >= 0; i--) {
-                    if (!balls[i].active || balls[i].exploded || balls[i].touched) continue;
-                    float dx = balls[i].x - (float)mousePosX;
-                    float dy = balls[i].y - (float)mousePosY;
-                    float dist2 = dx * dx + dy * dy;
-                    if (dist2 <= (balls[i].radius + mouseRadius) * (balls[i].radius + mouseRadius)) {
-                        grabbingIndex = i;
-                        balls[i].beingHeld = true;
-                        balls[i].touched = true;
-                        prevMouseX = mousePosX;
-                        prevMouseY = mousePosY;
-                        break;
+                // 2) マウス入力（掴む/離すの判定）
+                if (!prevMouseDown && mouseDown) {
+                    for (int i = ballCount - 1; i >= 0; i--) {
+                        if (!balls[i].active || balls[i].exploded || balls[i].touched) continue;
+                        float dx = balls[i].x - (float)mousePosX;
+                        float dy = balls[i].y - (float)mousePosY;
+                        float dist2 = dx * dx + dy * dy;
+                        if (dist2 <= (balls[i].radius + mouseRadius) * (balls[i].radius + mouseRadius)) {
+                            grabbingIndex = i;
+                            balls[i].beingHeld = true;
+                            balls[i].touched = true;
+                            prevMouseX = mousePosX;
+                            prevMouseY = mousePosY;
+                            break;
+                        }
                     }
                 }
-            }
-            else if (prevMouseDown && !mouseDown) {
-                if (grabbingIndex != -1) {
-                    Ball& b = balls[grabbingIndex];
-                    b.beingHeld = false;
-                    b.vx *= 1.2f;
-                    b.vy *= 1.2f;
-                    grabbingIndex = -1;
+                else if (prevMouseDown && !mouseDown) {
+                    if (grabbingIndex != -1) {
+                        Ball& b = balls[grabbingIndex];
+                        b.beingHeld = false;
+                        b.vx *= 1.2f;
+                        b.vy *= 1.2f;
+                        grabbingIndex = -1;
+                    }
+                }
+
+                // 3) パーティクル更新
+                for (int i = 0; i < maxParticles; i++) {
+                    if (!particles[i].active) continue;
+                    // 重力
+                    particles[i].vy += gravity;
+                    particles[i].x += particles[i].vx;
+                    particles[i].y += particles[i].vy;
+
+                    // 徐々に減速させる
+                    particles[i].vx *= 0.995f;
+                    particles[i].vy *= 0.995f;
+
+                    // 寿命を減らす
+                    particles[i].life--;
+                    if (particles[i].life <= 0) {
+                        particles[i].active = false;
+                    }
+
+                    // 床に当たったら跳ねて減速させる（簡易）
+                    if (particles[i].y + particles[i].size >= SCREEN_H) {
+                        particles[i].y = SCREEN_H - particles[i].size;
+                        particles[i].vy *= -0.4f;
+                        particles[i].vx *= 0.6f;
+                    }
                 }
             }
 
-            // 3) パーティクル更新
-            for (int i = 0; i < maxParticles; i++) {
-                if (!particles[i].active) continue;
-                // 重力
-                particles[i].vy += gravity;
-                particles[i].x += particles[i].vx;
-                particles[i].y += particles[i].vy;
-
-                // 徐々に減速させる
-                particles[i].vx *= 0.995f;
-                particles[i].vy *= 0.995f;
-
-                // 寿命を減らす
-                particles[i].life--;
-                if (particles[i].life <= 0) {
-                    particles[i].active = false;
-                }
-
-                // 床に当たったら跳ねて減速させる（簡易）
-                if (particles[i].y + particles[i].size >= SCREEN_H) {
-                    particles[i].y = SCREEN_H - particles[i].size;
-                    particles[i].vy *= -0.4f;
-                    particles[i].vx *= 0.6f;
-                }
-            }
             break;
         case SCORE:///////////////////////////////////////////////////////////////////
             if (keys[DIK_SPACE] && preKeys[DIK_SPACE] == 0) {
+                // 初期化してタイトルに戻る
+                InitGame(balls, ballCount, particles, maxParticles, missCount);
                 scene = TITLE;
             }
-            break;
         }
 
         // --- 更新処理 ------------------------------------------------
