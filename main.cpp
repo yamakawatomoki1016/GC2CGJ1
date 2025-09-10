@@ -8,7 +8,7 @@
 #define YELLOW 0xFFFFFF00
 #define ORANGE 0xFFFFA500
 
-const char kWindowTitle[] = "白黒ボムパニック！";
+const char kWindowTitle[] = "6044_白黒ボムパニック\n";
 
 // 画面サイズ
 const int SCREEN_W = 1280;
@@ -85,6 +85,7 @@ void SpawnExplosion(Particle particles[], int maxParticles, float cx, float cy) 
 // シーン列挙型
 enum Scene {
     TITLE,
+    TUTORIAL,
     GAME,
     SCORE
 };
@@ -158,6 +159,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     blackBallGH = Novice::LoadTexture("./Resources/blackBomb.png");//黒
     int lifeIcon = Novice::LoadTexture("./Resources/hp.png");//残機
     int pt = Novice::LoadTexture("./Resources/pt.png");
+    int tutorialGH = Novice::LoadTexture("./Resources/th.png");
 
     int numGH[10] = {};
     numGH[0] = Novice::LoadTexture("./Resources./0.png");
@@ -172,11 +174,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     numGH[9] = Novice::LoadTexture("./Resources./9.png");
 
     int gamaSceneBGM = Novice::LoadAudio("./Sound./gamaSceneBGM.mp3");
+    int getSH = Novice::LoadAudio("./Sound./get.mp3");
+    int explosionSH = Novice::LoadAudio("./Sound./bakuhatu.mp3");
 
     srand((unsigned int)time(nullptr));
 
     // ボール数
-    const int ballCount = 100;
+    const int ballCount = 300;
     Ball balls[ballCount];
 
     // パーティクル配列（十分な数）
@@ -263,6 +267,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                     playHandle = Novice::PlayAudio(gamaSceneBGM, true, 1);
                 }
             }
+            if (keys[DIK_RETURN] && preKeys[DIK_RETURN] == 0) {
+                scene = TUTORIAL;
+            }
+
+            break;
+        case TUTORIAL:
+            if (keys[DIK_RETURN] && preKeys[DIK_RETURN] == 0) {
+                scene = TITLE;
+            }
             break;
         case GAME:///////////////////////////////////////////////////////////////////
             //ゲーム開始タイマー（３秒）
@@ -304,6 +317,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                 // 一度も掴まれていなければ爆発
                                 balls[i].exploded = true;
                                 balls[i].active = false;
+                                Novice::PlayAudio(explosionSH, false, 3);
                                 SpawnExplosion(particles, maxParticles, balls[i].x, balls[i].y);
                                 missCount++;
                                 if (missCount >= maxMiss) {
@@ -352,6 +366,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
                 // 2) マウス入力（掴む/離すの判定）
                 if (!prevMouseDown && mouseDown) {
+                    Novice::PlayAudio(getSH, false, 2);
                     for (int i = ballCount - 1; i >= 0; i--) {
                         if (!balls[i].active || balls[i].exploded || balls[i].touched) continue;
                         float dx = balls[i].x - (float)mousePosX;
@@ -413,7 +428,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
 
         // --- 更新処理 ------------------------------------------------
-        
+
 
         // --- 描画処理 ------------------------------------------------
 
@@ -423,6 +438,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             Novice::DrawSprite(0, 0, title, 1.0f, 1.0f, 0.0f, WHITE);
 
             score = 0;
+            break;
+        case TUTORIAL:
+            Novice::DrawSprite(0, 0, tutorialGH, 1.0f, 1.0f, 0.0f, WHITE);
             break;
         case GAME:
             Novice::DrawSprite(0, 0, gameScene, 1.0f, 1.0f, 0.0f, WHITE);
@@ -495,7 +513,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 float scale = 1.0f;
 
                 for (int i = 0; i < 3; ++i) {
-                    Novice::DrawSprite(startX + i * 35 -50, startY, numGH[digits[i]], scale, scale, 0.0f, WHITE);
+                    Novice::DrawSprite(startX + i * 35 - 50, startY, numGH[digits[i]], scale, scale, 0.0f, WHITE);
                 }
 
                 // スコア右にPT画像を表示
@@ -532,6 +550,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             for (int i = 0; i < 3; ++i) {
                 Novice::DrawSprite(450 + i * 85, 360, numGH[numArray[i]], 2.5f, 2.5f, 0.0f, WHITE);
             }
+
             Novice::DrawSprite(480 + 3 * 85 + 20, 400 + 60, pt, 2.0f, 2.0f, 0.0f, WHITE);
 
             // 左側にランキング表示
