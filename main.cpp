@@ -197,7 +197,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     // --- シーン管理用変数 ---
     Scene scene = TITLE;
-    //int score = 0;
+    int score = 0;
     int missCount = 0;   // ミスした回数
     const int maxMiss = 3;
     // ゲーム開始時のカウントダウン用
@@ -267,7 +267,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                         // 地面に着いたら判定
                         if (balls[i].y + balls[i].radius >= SCREEN_H) {
                             balls[i].y = SCREEN_H - balls[i].radius;
-
                             if (!balls[i].touched) {
                                 // 一度も掴まれていなければ爆発
                                 balls[i].exploded = true;
@@ -279,7 +278,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                 }
                             }
                             else {
-                                // --- 仕分け判定を追加 ---
+                                // --- 仕分け判定 ---
                                 bool correct = false;
                                 if (balls[i].color == WHITE && balls[i].x > SCREEN_W / 2) {
                                     correct = true; // 白は右
@@ -288,11 +287,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                                     correct = true; // 黒は左
                                 }
 
-                                if (!correct) {
-                                    // ミス → カウントを増やす
+                                if (correct) {
+                                    score++; // 正解ならスコア加算
+                                }
+                                else {
                                     missCount++;
                                     if (missCount >= maxMiss) {
-                                        // 3回ミスで終了
                                         scene = SCORE;
                                     }
                                 }
@@ -432,7 +432,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                     WHITE          // 色
                 );
             }
-
+            Novice::ScreenPrintf(1000,30,"%d", score);
             break;
         case SCORE:
             break;
