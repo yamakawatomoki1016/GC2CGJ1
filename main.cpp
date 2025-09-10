@@ -157,6 +157,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     whiteBallGH = Novice::LoadTexture("./Resources/whiteBomb.png");//白
     blackBallGH = Novice::LoadTexture("./Resources/blackBomb.png");//黒
     int lifeIcon = Novice::LoadTexture("./Resources/hp.png");//残機
+    int pt = Novice::LoadTexture("./Resources/pt.png");
 
     int numGH[10] = {};
     numGH[0] = Novice::LoadTexture("./Resources./0.png");
@@ -473,17 +474,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             }
 
             if (gameTimer >= 0 && gameTimer < 60) {
-                Novice::DrawSprite(550, 50, numGH[3], 2.0f, 2.0f, 0.0f, WHITE);
+                Novice::DrawSprite(570, 50, numGH[3], 2.0f, 2.0f, 0.0f, WHITE);
             }
             else if (gameTimer >= 60 && gameTimer < 120) {
-                Novice::DrawSprite(550, 50, numGH[2], 2.0f, 2.0f, 0.0f, WHITE);
+                Novice::DrawSprite(570, 50, numGH[2], 2.0f, 2.0f, 0.0f, WHITE);
             }
             else if (gameTimer >= 120 && gameTimer < 180) {
-                Novice::DrawSprite(550, 50, numGH[1], 2.0f, 2.0f, 0.0f, WHITE);
+                Novice::DrawSprite(570, 50, numGH[1], 2.0f, 2.0f, 0.0f, WHITE);
             }
 
             if (score <= hiScore) {
                 hiScore = score;
+            }
+
+            // 右上スコア表示
+            {
+                int digits[3];
+                SplitScoreToDigits(score, digits, 3); // scoreを3桁に分割
+                int startX = SCREEN_W - 3 * 45 - 20; // 右端から余白20px
+                int startY = 20;                     // 上から20px
+                float scale = 1.0f;
+
+                for (int i = 0; i < 3; ++i) {
+                    Novice::DrawSprite(startX + i * 35 -50, startY, numGH[digits[i]], scale, scale, 0.0f, WHITE);
+                }
+
+                // スコア右にPT画像を表示
+                Novice::DrawSprite(startX + 3 * 25 + 10, startY + 30, pt, scale, scale, 0.0f, WHITE);
             }
 
             break;
@@ -496,6 +513,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             // 重複を除いて上位3位に反映
             int idx = 0;
             int lastScore = -1;
+
             for (int i = 0; i < 4 && idx < 3; ++i) {
                 if (temp[i] != lastScore) {
                     highScores[idx++] = temp[i];
@@ -521,9 +539,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 if (highScores[rank] == 0) continue; // 空白なら描画しない
                 int digits[3];
                 SplitScoreToDigits(highScores[rank], digits, 3);
+
+                int startX = 70;
+                int startY = 310 + rank * 75;
+                int digitWidth = 45;
+                float scale = 1.2f;
+
+                // 数字を描画
                 for (int i = 0; i < 3; ++i) {
-                    Novice::DrawSprite(50 + i * 60, 120 + rank * 100, numGH[digits[i]], 2.0f, 2.0f, 0.0f, WHITE);
+                    Novice::DrawSprite(startX + i * digitWidth, startY, numGH[digits[i]], scale, scale, 0.0f, WHITE);
                 }
+
+                // 数字の右にPT画像を1回だけ描画
+                Novice::DrawSprite(startX + 3 * digitWidth + 30, startY + 40, pt, scale, scale, 0.0f, WHITE);
             }
         }
         break;
